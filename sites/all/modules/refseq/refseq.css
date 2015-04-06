@@ -1,0 +1,34 @@
+
+#refseq-block-genomes-form div{
+	float:left;
+	padding: 0 20px;
+}
+#refseq-block-genomes-form .form-actions{
+	margin: 1em 0;
+}
+#refseq-block-genomes-form > div{
+	width: 100%;
+	position: relative;
+	margin: 0px;
+	padding: 0px;
+	
+}
+
+#highlighted { 
+    margin-bottom: 2em;
+    padding: 0em;
+}
+
+#uploadfile-controls, #db_controls
+{
+	width: 45%;
+	float: left;
+	padding: 20px;
+	
+}
+#crossref_result_controls, #edit-mapping-field-search
+{
+	margin-left:20px;
+	display:block;
+	clear: both;
+}

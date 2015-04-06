@@ -1,0 +1,16 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the uc_product module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+
+/**
+ * Implements hook_uninstall().
+ */
+
+

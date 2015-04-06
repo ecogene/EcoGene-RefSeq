@@ -1,0 +1,1145 @@
+<?php
+global $fna_dir, $faa_dir;
+$fna_dir = drupal_get_path('module', 'refseq').'/files/fna/';
+$faa_dir = drupal_get_path('module', 'refseq').'/files/faa/';
+
+/******************************************************************************
+ * Drupal Hooks                                                               *
+ ******************************************************************************/
+
+/**
+ * Implements hook_menu().
+ */
+function refseq_menu() {
+  $items = array();
+  $items['refseq/genomes'] = array(   
+						'title' => 'Genomes',  
+    					'page callback' => 'refseq_list_genome',   
+    					'access callback' => TRUE,
+     					
+    	); 
+  $items['refseq/genomes/*'] = array(   
+						'title' => 'Genomes',  
+    					'page callback' => 'refseq_list_genome',   
+    					'access callback' => TRUE,
+     					
+    	);
+  $items['refseq/genomes/*/*'] = array(   
+						'title' => 'Genomes',  
+    					'page callback' => 'refseq_list_genome',   
+    					'access callback' => TRUE,
+     					
+    	);
+		$items["refseq/%"] = array(   
+						'title callback' => 'refseq_sequence_title', 
+						'title arguments' => array(1),
+    					'page callback' => 'refseq_sequence_info',   
+						'access callback' => TRUE,
+    					'type' => MENU_VISIBLE_IN_BREADCRUMB,
+						'page arguments' => array(1),
+     					
+    	); 
+
+    	$items["refseq/%/summary"] = array(					     
+						'title' => 'Summary',  
+    					'access callback' => TRUE,						
+    					'type' => MENU_DEFAULT_LOCAL_TASK,
+     					
+    	); 
+    	
+    	$items["refseq/%/crossref"] = array(					     
+						'title' => 'Cross Reference Mapping and Download ', 	
+    					'page arguments' => array('refseq_cross_ref_form'),
+    					'access callback' => TRUE,
+  						'type'=>MENU_LOCAL_TASK,
+    					'weight' => 101,
+     					'page callback' => 'drupal_get_form',
+    	);  	
+
+
+  $items['refseq_data/%/%/%/csv'] = array(
+   	'page callback' => 'refseq_get_csv',
+    'page arguments' => array(2, 3),
+  	'access callback' => TRUE,
+ //   'access arguments' => array('administer users'),
+    'type' => MENU_CALLBACK,
+    'weight' => 12,
+  );
+	$items['refseq_data/%/%/%/txt'] = array(
+   	'page callback' => 'refseq_get_txt',
+    'page arguments' => array(2, 3),
+	'access callback' => TRUE,
+ //   'access arguments' => array('administer users'),
+    'type' => MENU_CALLBACK,
+    'weight' => 12,
+  );
+ 
+  return $items;
+    
+}
+
+function refseq_sequence_title($seqence_acc){
+	db_set_active("refseq");
+	
+	$title = db_query( "SELECT CONCAT(taxname,' ', genome, ' ',  genome_name) FROM summary WHERE Accession like :acc", 
+				array(':acc'=>$seqence_acc.'%'))->fetchField();
+	db_set_active("default");
+  	return $title;	
+	
+}
+
+function refseq_sequence_info($seqence_acc){
+	
+	db_set_active("refseq");
+//	
+//	$info = db_select( "SELECT *, type FROM gene WHERE Accession =:acc ", 
+//				array(':acc'=>$seqence_acc))->fetchAllAssoc('GeneID', PDO::FETCH_ASSOC);
+
+  $query = db_select('gene', 'gene', array('fetch' => PDO::FETCH_ASSOC));
+  $query->fields('gene', array(
+  	  'type',
+      'geneid',
+      'pseudo'	
+    ))
+    ->condition('accession', $seqence_acc);
+
+   $info = $query->execute()->fetchAll();
+//echo $seqence_acc;
+//echo count($info);
+//return;
+   if(empty($info)){
+   	db_set_active("default");
+   		$build['no-found'] = array(
+    	
+    	'#markup' => t('Accession is not found!'),
+  		);
+  		return $build;
+   }
+   
+//	var_dump($info);
+	$protein = array('number'=>0, 'id'=>array());
+	$rna = array('number'=>0, 'id'=>array());
+	$pseudo = array('number'=>0, 'id'=>array());
+	$other = array('number'=>0, 'id'=>array());
+	
+	
+	foreach ($info as $key=>$value) {
+		if($info[$key]['type']=='protein')  ;
+//		var_dump($info[$key]);
+		$GeneID = $info[$key]['geneid'];
+		if($info[$key]['type']=='protein')	{
+			$protein['id'][] = $GeneID;	
+			$protein['number']++;
+		}
+		elseif($info[$key]['type']=='rna')	{
+			$rna['id'][] = $GeneID;
+			$rna['number']++;
+		}else{
+			$other['id'][] = $GeneID;
+			$other['number']++;
+		}	
+		
+		if($info[$key]['pseudo']=='true')	{
+			$pseudo['id'][] = $GeneID;	
+			$pseudo['number']++;
+		}
+	}	
+	db_set_active("default");
+	$rows = array();
+//	$rows[] = array('<b>Total</b>',  
+//					l(($protein['number'])+ ($rna['number'])+ ($other['number']),"refseq/$seqence_acc/searchtool///all///all"));
+	
+	$rows[] = array('<b>Protein</b>', 
+					l(($protein['number']),"refseq/$seqence_acc/searchtool///protein///all"));
+
+	$rows[] = array('<b>RNA</b>', 
+					l(($rna['number']), "refseq/$seqence_acc/searchtool///rna///all"));
+	
+	$rows[] = array('<b>Other</b>', 
+					l(($other['number']),"refseq/$seqence_acc/searchtool///other///all"));
+	$rows[] = array('<b>Pseudogene</b>',  
+					l(($pseudo['number']),"refseq/$seqence_acc/searchtool///all///all/1"));
+ db_set_active("refseq");
+	$query = db_select('summary', 'summary', array('fetch' => PDO::FETCH_ASSOC))
+  			->fields('summary')
+  			->condition('summary.included', 1)
+  			->condition('accession', $seqence_acc.'%', 'LIKE');
+  
+   $value = $query->execute()->fetchAssoc();
+//	var_dump($value);
+
+    // get the Chromesome and Plasmid information of the corresponding BioProject
+    
+   $query = db_query("select *, CONCAT(genome, ' ',  genome_name) as name from  summary where `projectid`=:project order by genome, genome_name",
+   						array(':project'=>$value['projectid']), array( 'fetch' => PDO::FETCH_ASSOC,));
+
+   $value_project = $query->fetchAllAssoc('accession');
+//   var_dump($value_project);
+	$html_table='';
+   	global  $base_url;
+   	if(!empty($value_project)){
+   		$html_table = '<table><caption><b>Project Info</b></caption><tr><th>Name</th><th>RefSeq Acc</th><th>GenBank Acc</th></tr>';
+   		foreach ($value_project as $ind=>$v) {
+   		  			
+   			$html_table .=  '<tr><td>'.l($v['name'], $base_url.'/refseq/'.strstr($v['accession'], '.', TRUE)).'</td>';   		
+   			$html_table .=  '<td>'.l($v['accession'],'http://www.ncbi.nlm.nih.gov/nuccore/'.$v['accession']).'</td>';
+   			$html_table .=  '<td>'.l($v['genbankacc'],'http://www.ncbi.nlm.nih.gov/nuccore/'.$v['genbankacc']).'</td></tr>';
+   		}
+   		$html_table .='</table>';
+   	}
+   
+//   $query = db_query("select * from  prokaryotes where `BioProject ID`=:project",
+//   						array(':project'=>$value['projectid']), array( 'fetch' => PDO::FETCH_ASSOC,));
+//
+//   $value_project = $query->fetchAssoc();
+//   $value_project['Plasmids/RefSeq'] = trim($value_project['Plasmids/RefSeq']," \r\t\n-");
+//   $value_project['Plasmids/INSDC'] = trim($value_project['Plasmids/INSDC']," \r\t\n-") ;		
+//   $plasmids_nc = empty($value_project['Plasmids/RefSeq'])? array(): explode(",", $value_project['Plasmids/RefSeq']);
+//   $plasmids_insdc =  empty($value_project['Plasmids/INSDC'])? array(): explode(",", $value_project['Plasmids/INSDC']);
+//   $chromesome_nc = explode(",", trim($value_project['Chromosomes/RefSeq']));
+//   $chromesome_insdc = explode(",", trim($value_project['Chromosomes/INSDC']));
+//   
+//   $html_table='';
+//   global  $base_url;
+//   if(!empty($value_project)){
+//   	$html_table = '<table><caption><b>Project Info (Plasmid sequences have not been imported into EcoGene-RefSeq)</b></caption><tr><th>TYPE</th><th>RefSeq Acc</th><th>GenBank Acc</th></tr>';
+//   	foreach ($chromesome_nc as $ind=>$v) {
+//   		  			
+//   		$html_table .=  '<tr><td>'.l('Chromosome', $base_url.'/refseq/'.strstr($v, '.', TRUE)).'</td>';   		
+//   		$html_table .=  '<td>'.l($chromesome_nc[$ind],'http://www.ncbi.nlm.nih.gov/nuccore/'.$chromesome_nc[$ind]).'</td>';
+//   		$html_table .=  '<td>'.l($chromesome_insdc[$ind],'http://www.ncbi.nlm.nih.gov/nuccore/'.$chromesome_insdc[$ind]).'</td></tr>';
+//   	}
+//
+//   	if(!empty($plasmids_nc)){
+//   	foreach ($plasmids_nc as $ind=>$v) {
+//   		  			
+//   		$html_table .=  '<tr><td>'.l('Plasmid', $base_url.'/refseq/'.strstr($v, ".", TRUE)).' </td>';
+//   		
+//   		$html_table .=  '<td>'.l($plasmids_nc[$ind],'http://www.ncbi.nlm.nih.gov/nuccore/'.$plasmids_nc[$ind]).'</td>';
+//   		$html_table .=  '<td>'.l($plasmids_insdc[$ind],'http://www.ncbi.nlm.nih.gov/nuccore/'.$plasmids_insdc[$ind]).'</td></tr>';
+//   	}
+//   	}
+//   	$html_table .='</table>';
+//   
+//   }
+    db_set_active("refseq");
+   //query for publication
+   $query = db_select('publication', 'publication', array('fetch' => PDO::FETCH_ASSOC))
+  			->fields('publication')
+  			->condition('projectid', $value['projectid'])->groupBy('pubmed_id');
+   
+ 
+   $value_publication = $query->execute()->fetchAll();
+	
+   if(count($value_publication)>0){
+	   	$html_publication_list = '<ul>';
+	   	foreach ($value_publication as $vp) {
+	   		$vp['text'] = str_replace('/pubmed/', 'http://www.ncbi.nlm.nih.gov/pubmed/', $vp['text']);
+	   		$html_publication_list .= $vp['text'].'</i>';
+	   	}	   	
+	   	$html_publication_list .='</ul>';
+	}
+   
+   
+	db_set_active("default");
+
+
+	$build['info'] = array(
+	    	
+    	'#markup' =>'<table><caption style="text-align: left"><b>Genome Info<b></caption><tr><td>' .
+    				'Length: '.$value['length'].'<br />'.
+    				'RefSeq Acc: '.l($value['accession'],'http://www.ncbi.nlm.nih.gov/nuccore/'.$value['accession']).'<br />'.
+					 'GenBank Acc: '.l($value['genbankacc'],'http://www.ncbi.nlm.nih.gov/nuccore/'.$value['genbankacc']).'<br />'.
+					 'Project ID: '.l($value['projectid'],'http://www.ncbi.nlm.nih.gov/bioproject/'.$value['projectid']).'</td></tr></table>'.
+					 $html_table,
+					    	
+  	);
+  	
+	
+  	
+	$build['report'] = array(
+    	'#theme' => 'table',
+    	'#rows' => $rows,
+		'#caption'=>'<b>Gene Info</b> ',
+    	'#attributes' => array('caption'=>'Genes', 'width' => '250px', 'class' => array('')),
+  	);
+  	if(!empty($html_publication_list)){
+  		$build['pubmed'] = array(    	
+    	'#markup' => '<br /><div id="publication"> Publication </div>'.
+    		$html_publication_list.'</div>',
+  	);
+  	}
+  	
+	return $build;	
+	
+}
+
+function refseq_list_genome(){
+
+	if(is_null(arg(2))){
+		$args = array();
+	}else{
+	$args = array(
+		'genome_name'=>arg(2),
+	);
+	}
+	if(is_null(arg(3))){
+		$args['genome_group'] = 'all';
+	}else{
+		$args['genome_group'] = arg(3);
+	}
+	if(is_null(arg(4))){
+		$args['genome_type'] = 'all';
+	}else{
+		$args['genome_type'] = arg(4);
+	}
+	if(is_null(arg(5))){
+		$args['item_per_page'] = 20;
+	}else{
+		$args['item_per_page'] = arg(5);
+	}
+
+	
+	db_set_active("refseq");
+	 
+  $header = array(   
+    array('data' => t('')),
+    array('data' => t('Name'), 'field' => "taxname"),
+//    array('data' => t('Genome'), 'field' => "genome"),
+    array('data' => t('RefSeq Accession'), 'field' => "accession"),
+    array('data' => t('GenbankAcc'), 'field' => 'genbankacc'),
+    array('data' => t('ProjectID'), 'field' => 'projectid'),
+    array('data' => t('Length'), 'field' => 'length'),
+    array('data' => t('Gene'), 'field' => 'gene'),
+	array('data' => t('Protein'), 'field' => 'protein'),
+  );
+  
+  
+  $query = db_select('summary', 'summary', array('fetch' => PDO::FETCH_ASSOC))->extend('TableSort');
+  if(is_numeric($args['item_per_page'])){
+  		$query = $query->extend('PagerDefault')->limit($args['item_per_page']);
+  }
+  
+  $query->fields('summary', array(
+  	  'taxname',
+      'accession',
+      'genbankacc',
+  	  'length',
+      'protein',
+  	  'gene',	
+      'projectid',
+  	  'genome',
+  	  'genome_name'
+    ));
+	if(isset($args['genome_name'])&&(!empty($args['genome_name']))){
+
+    	$value = $args['genome_name'];				
+		$query -> condition(db_or()
+						->condition('summary.genbankacc', '%%'.$value.'%%', 'LIKE')
+						->condition('summary.accession', '%%'.$value.'%%', 'LIKE')
+						->condition('summary.taxname', '%%'.$value.'%%', 'LIKE')
+						);
+			
+	}
+
+
+	if(isset($args['genome_group'])){
+		if(strcasecmp($args['genome_group'], 'bacteria') == 0){
+			$query -> condition('summary.group', '%' . db_like('archaeota') . '%', 'NOT LIKE')
+				   -> condition('summary.group', '%' . db_like('Archaea') . '%', 'NOT LIKE');
+	
+		}elseif(strcasecmp($args['genome_group'], 'archaea') == 0){
+			$query -> condition(db_or()->condition('summary.group', '%' . db_like('archaeota') . '%', 'LIKE')
+				   -> condition('summary.group', '%' . db_like('Archaea') . '%', 'LIKE'));
+		}
+    				
+	}
+
+	if(isset($args['genome_type'])){
+		if(strcasecmp($args['genome_type'], 'chromosome') == 0){
+			$query -> condition('summary.genome', 'chromosome');				 
+	
+		}elseif(strcasecmp($args['genome_type'], 'plasmid') == 0){
+			$query -> condition('summary.genome', 'plasmid');
+		}
+    				
+	}
+	
+    $query -> condition('summary.included', 1);
+    $query -> condition('summary.gene', 0, '>');
+    $query ->orderByHeader($header)
+    ->orderBy('summary.order', 'DESC')
+    ->orderBy('summary.accession', 'DESC');
+  	
+    $query0 = clone $query;
+    $total_items = $query0->groupBy('summary.projectid')->CountQuery()->execute()->fetchField();
+    $query1 = clone $query;
+    $total_plasmids= $query1 -> condition('genome', '%' . db_like('Plasmid') . '%', 'LIKE')
+    				->CountQuery()->execute()->fetchField();
+    $query2 = clone $query;
+    $total_Chromosomes= $query2 -> condition('genome', '%' . db_like('Chromosome') . '%', 'LIKE')
+    				->CountQuery()->execute()->fetchField();
+    				
+   	$records = $query->execute()->fetchAll();
+    db_set_active("default");
+    $rows = array();
+    $line=1;
+    foreach ($records as $key => $value) {
+    	$acc = strstr($value['accession'], ".", TRUE);
+    	$g_name = $value['taxname'].' '.$value['genome'].' '.$value['genome_name'];
+    	
+    	$rows[] = array(
+    	$line,
+//    	l('Summary ',"refseq/{$acc}/").l('| PrimerPair ',"refseq/{$acc}/primerpair").l('| Gene Index ',"refseq/{$acc}/geneindex").l('| Search ',"refseq/{$acc}/searchtool"),
+    	$g_name,
+//    	$value['genome'],
+    	l($value['accession'],'http://www.ncbi.nlm.nih.gov/nuccore/'.$value['accession']),
+    	l($value['genbankacc'],'http://www.ncbi.nlm.nih.gov/nuccore/'.$value['genbankacc']),
+    	l($value['projectid'],'http://www.ncbi.nlm.nih.gov/bioproject/'.$value['projectid']),
+    	$value['length'],
+    	$value['gene'],
+    	$value['protein'],
+    	);
+    	$rows[] =array(array(),
+    	array('colspan'=>7,'data'=>l('Summary ',"refseq/{$acc}/").' | '.
+    							l(' PrimerPair ',"refseq/{$acc}/primerpair").' | '.
+    							l(' Gene Index ',"refseq/{$acc}/gene").' | '.
+    							l(' Search ',"refseq/{$acc}/searchtool").' | '.
+    							l(' Cross Reference',"refseq/{$acc}/crossref"))
+
+
+    	);
+    	$line++;
+    }
+   $build['form'] = drupal_get_form('refseq_select_genome_form',$args);
+   $caption = $total_items>1?'Total: <b>'.$total_items.'</b> Genome Projects including ':'Total: <b>'.$total_items.'</b> Genome Project including ';
+   $caption .= $total_Chromosomes>1?'<b>'.$total_Chromosomes.'</b> Chromosomes and ':'<b>'.$total_Chromosomes.'</b> Chromosome and ';
+   $caption .= $total_plasmids>1?'<b>'.$total_plasmids.'</b> Plasmids ':'<b>'.$total_plasmids.'</b> Plasmid'; 
+   $build['caption'] = array(
+   '#markup' => $caption,
+   );
+  	$build['report'] = array(
+    	'#theme' => 'table',
+//  		'#caption'=>'Total: <b>'.$total_items.'</b> Genomes',
+    	'#header' => $header,
+    	'#rows' => $rows,
+    	'#attributes' => array('width' =>'100%',
+  		),
+  	);
+  	$build['pager'] = array(
+    	'#theme' => 'pager',
+  	);
+  	
+	return $build;	
+}
+
+
+function refseq_select_genome_form($form, &$form_state,$values=array()){
+
+  $form['genome_name'] = array(
+  		'#type' => 'textfield',
+  	
+  		'#size' => 30,
+  		'#default_value' => isset($values['genome_name'])?$values['genome_name']:'',
+  		'#description' => t('Name or RefSeq accession'),
+		'#weight' => -100,
+  		'#prefix' => '<div style="float:left;">',
+    	'#suffix' => '</div>',
+  		
+  );
+  $form['genome_group'] = array(
+  		'#type' => 'select',
+    	'#options' => array(
+      		'all' =>t('All Prokaryotes'),
+      		'bacteria' =>t('Bacteria'),
+      		'archaea' =>t('Archaea'),
+    	),	
+    	'#attributes' => array('onchange' => "form.submit()"),
+  		'#default_value' => isset($values['genome_group'])?$values['genome_group']:'all',
+  		'#description' => t('Domain'),
+		'#weight' => 1,  
+    	'#prefix' => '<div style="padding-left: 10px; float:left;">',
+    	'#suffix' => '</div>',
+  );
+  
+  $form['genome_type'] = array(
+  		'#type' => 'select',
+    	'#options' => array(
+      		'all' =>t('All'),
+      		'chromosome' =>t('Chromosome'),
+      		'plasmid' =>t('Plasmid'),
+    	),	
+    	'#attributes' => array('onchange' => "form.submit()"),
+  		'#default_value' => isset($values['genome_type'])?$values['genome_type']:'all',
+  		'#description' => t('Genome type'),
+		'#weight' => 10,    
+    	'#prefix' => '<div style="padding-left: 10px; float:left;">',
+    	'#suffix' => '</div>',	
+  		
+  );
+  
+ $form['item_per_page'] = array(
+  		'#type' => 'select',
+//    	'#title' => t('Per Page'),
+    	'#options' => array(
+ 			10 => t('10'),
+      		20 => t('20'),
+      		50 => t('50'),
+      		100 => t('100'),
+      		200 => t('200'),
+      		'all' =>t('All'),
+    	),	
+  		'#default_value' => isset($values['item_per_page'])?$values['item_per_page']:20,
+  		'#description' => t('per page'),
+		'#weight' => 100,
+    	'#attributes' => array('onchange' => "form.submit()"),
+    	'#prefix' => '<div style="padding-left: 10px; float:left; clear: right">',
+    	'#suffix' => '</div>',
+//    	'#prefix' => '<div style="clear:both;">',	
+//   		'#suffix' => '</div>',
+  		
+  );
+  
+  $form['actions'] = array('#type' => 'actions',
+ 
+  );
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Search'),
+  	'#weight' => 110,
+  	'#prefix' => '<div style="clear:both; margin-top:1em;">',
+   	'#suffix' => '</div>',
+  
+  );
+  return $form;
+	
+}
+
+function refseq_select_genome_form_submit($form, &$form_state) {
+	
+	
+	$genome_name = $form_state['values']['genome_name'];
+	$item_per_page = $form_state['values']['item_per_page'];
+	$group = $form_state['values']['genome_group'];
+	$type = $form_state['values']['genome_type'];
+	
+	
+	$form_state['redirect'] = 'refseq/genomes/'.$genome_name.'/'.$group.'/'.$type.'/'.$item_per_page;
+	
+}
+
+
+function refseq_block_info() {
+
+  $blocks['refseq'] = array(
+  			'info' => t('RefSeq menu'),
+  			'region' =>'sidebar_first',
+  			'visibility' => BLOCK_VISIBILITY_PHP,
+    		'pages' => '<?php if ((arg(0) == "refseq") && (arg(1) != "search")) return TRUE; else return FALSE; ?>'
+  );
+  
+    $blocks['select_genome'] = array(
+  			'info' => t('Select Genome'),
+  			'region' =>'sidebar_first',
+  			
+  );
+  
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function refseq_block_view($delta = '') {
+  
+  $accession = arg(1);	
+  if(empty($accession))	return ;
+  $block = array();
+  switch ($delta) {
+     case 'refseq':
+     	$items = array( l('Summary',"refseq/{$accession}"),
+     					l('Gene Index',"refseq/{$accession}/gene"),
+     					l('PrimerPair Design ',"refseq/{$accession}/primerpair"),
+     					l('Search Tool',"refseq/{$accession}/searchtool"),
+     					'',
+     					l('Return to RefSeq List',"refseq"), 
+     					);
+     	$variables = array('items'=>$items, 'title'=>'', 'type'=>'ul', 'attributes' => array('class'=>'menu'));
+  		
+     	$content = theme_item_list($variables).drupal_render(drupal_get_form('refseq_block_search_form'));
+         $block = array('subject' => t('RefSeq : '.$accession),
+          'content' => $content);
+      case 'select_genome':     	
+     	$content = drupal_render(drupal_get_form('refseq_block_genomes_form'));
+         $block = array(
+//         'subject' => t('Genome Selection'),
+          'content' => $content);
+             
+        break;
+
+  }
+  return $block;
+}
+
+function refseq_genome_list()
+{
+	
+  $query = db_select('summary', 'summary', array('fetch' => PDO::FETCH_ASSOC))->extend('TableSort');
+ 
+  
+  $query->fields('summary', array(
+  	  'taxname',
+      'accession',    
+    ));
+	
+    $query -> condition('summary.included', 1);
+    $query -> condition('summary.gene', 0, '>');
+    $query -> orderBy('summary.order', 'DESC');
+    $query -> orderBy('summary.accession', 'DESC');
+    $query -> orderBy('summary.taxname', 'ASC');
+    db_set_active("refseq");
+    $records = $query->execute()->fetchAll();
+    db_set_active("default");
+    
+    $rows = array();
+    $line=1;
+    foreach ($records as $key => $value) {
+    	$acc = strstr($value['accession'], ".", TRUE);
+
+    	$rows[$acc] = $value['taxname'];
+    	
+    }
+//     print_r($rows);
+    return $rows;
+   
+}
+
+function refseq_block_genomes_form($form, &$form_state) {
+		
+	$form['#attached'] = array(
+    	'css' => array   (
+        	'type' => 'file',
+        	'data' => drupal_get_path('module', 'refseq') . '/refseq.css',
+			'group'=>CSS_THEME,
+			'weight'=>1000,
+    	),
+    
+	);
+	
+ $form['options'] = array(
+  	
+  	'#type' => 'fieldset',
+    '#title' => t('Switch Genome'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+	
+  	);
+  	
+//   $form['options']['genome'] = array(
+//  		'#type' => 'textfield',
+//  		'#default_value' => '',
+//  		'#size' => 15,
+// 	);
+	$form['options']['genome_list'] = array(
+  		'#type' => 'select',
+		'#multiple' => false,
+		'#attributes'=>array('size'=>6),
+  		'#options' => refseq_genome_list(),
+		'#default_value' => arg(1),
+ 	);
+ 	$form['options']['task_list'] = array(
+  		'#type' => 'select',
+		'#options' => array(
+      		'summary' => t('Summary'),
+      		'gene' => t('Gene Index'),
+ 			'primerpair' => t('PrimerPair Design'),
+ 			'searchtool' => t('Search Genes'),
+ 			'crossref' => t('Cross Reference')
+    	),
+    	'#default_value' => arg(2),
+ 	);
+ 	  
+	$form['options']['actions'] = array('#type' => 'actions', '#weight' => 10,);
+ 	$form['options']['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Select'),
+  	'#weight' => 10,
+ 	
+  	);
+    	
+  	return $form;
+}
+function refseq_block_genomes_form_submit($form, &$form_state) {
+ 
+	
+    $genome_acc = $form_state['values']['genome_list'];
+    $genome_task = $form_state['values']['task_list'];
+ 
+
+  $form_state['redirect'] = 'refseq/'.$genome_acc.'/'.$genome_task;
+	
+}
+
+function refseq_block_search_form($form, &$form_state) {
+	
+	$css = "#refseq_search_gene_block_form >div {margin: 0 }";
+	
+	 $form['options'] = array(
+  	 '#type' => 'container',
+     '#weight' => -8,
+	 '#id' => 'refseq_search_gene_block_form',
+	 '#attached' => array(
+    	'css' => array   (
+        	'type' => 'inline',
+        	'data' => $css,
+    	),),	
+  	);
+  	
+ $form['options']['geneid'] = array(
+  		'#type' => 'textfield',
+  		'#default_value' => '',
+  		'#size' => 12,
+ 	);
+	  
+	$form['options']['actions'] = array('#type' => 'actions', '#weight' => 10,);
+ 	$form['options']['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Search Genes'),
+  	'#weight' => 10,
+ 	
+  	);
+    	
+  	return $form;
+}
+
+function refseq_block_search_form_submit($form, &$form_state) {
+ 
+	$genome_acc = arg(1);
+  
+	
+   $args = array(
+//    $form_state['values']['gene_type'],
+    $form_state['values']['geneid'],
+
+  );
+
+  $form_state['redirect'] = 'refseq/'.$genome_acc.'/searchtool/' . implode('/', $args);
+	
+}
+function refseq_crossref_dblist($acc)
+{
+	$db_list = array('geneid'=>array('db_name'=>'Gene ID'),
+					'name'=>array('db_name'=>'Name'),
+					'locus_tag'=>array('db_name'=>'Locus Tag'),
+//					'pid'=>array('db_name'=>'PID'),
+					'protein_id'=>array('db_name'=>'Protein ID'),
+	);
+	db_set_active("refseq");
+	$query = db_select('dbxref', 'dbxref', array('fetch' => PDO::FETCH_ASSOC));
+ 	$query->fields('dbxref', array('db',));
+	
+    $query -> condition('dbxref.accession', $acc);
+    $query -> groupBy('dbxref.db', 'ASC');
+     
+   	$records = $query->execute()->fetchAll();
+    
+   
+    foreach ($records as $key => $value) {
+    	$db_list[$value['db']] = array(
+    		'db_name'=>$value['db']
+    	);    	
+    }
+    db_set_active("default");
+    return $db_list;
+	
+}
+function refseq_cross_ref_form($form, &$form_state) {
+	  	$form['#tree'] = TRUE;
+	
+    $acc = arg(1);
+    $form['genome_acc'] = array(
+	    '#type' => 'value',
+  		'#value' => $acc,
+    );
+  	$form['file_field'] = array(
+	    '#type' => 'fieldset',
+  		'#collapsible' => false,
+  		'#title'=>'Choose genes'	, 
+  		'#prefix' => '<div id="uploadfile-controls">',
+    	'#suffix' => '</div>', 		
+    );
+     $form["file_field"]["get_all"] = array(
+      	'#type' => 'checkbox',
+     	'#title' => 'All genes',   	
+     	'#default_value' =>0,
+	
+    );
+    
+    $form["file_field"]["uploadfile"] = array(
+   		'#attributes' => array('enctype' => "multipart/form-data"),
+     	'#type' => 'file',
+    	'#name' => "files[accessions_file_uploadfile]",
+    	'#title' => 'Or upload accessions from CSV or Tab delimited TXT File',
+  		'#description'=>'One accession per line and the first column must be the accessions',
+	
+    );
+      
+    $form["file_field"]["data_input"] = array(
+      	'#type' => 'textarea',
+     	'#rows' => 10,
+     	'#cols' => 30,
+     	'#title' => 'Or input accessions in the text area',
+   		'#description'=>'Separate accession numbers using a space or new line',
+     	
+	
+    );
+    
+    $form['db_field'] = array(
+   		'#type' => 'fieldset',
+   		'#collapsible' => false,
+   		'#title' => 'Choose identifiers',
+     	'#prefix' => '<div id="db_controls">',
+    	'#suffix' => '</div>',
+    );
+    $form['db_field']['dblist'] = array(
+  	 '#type' => 'tableselect',
+   	 '#multiple' =>TRUE,
+   	 '#header' => array('db_name' => t('DB Name')),    
+     '#options' =>  refseq_crossref_dblist($acc),
+     '#default_value' => array('geneid'=>1,'name'=>1) ,
+     '#empty' => t('No GeneSet available.'),
+  	
+		
+ 	);	
+
+    $form['mapping_field']['search'] = array(
+  		'#value'=>t('Submit'),
+	    '#type' => 'submit',
+  		'#ajax' => array(
+      		'callback' => 'ajax_crossref_callback',
+  			'wrapper' => 'crossref_result_controls',
+    	),	    	
+ 	);
+ 	$form['mapping_result']['table'] = array(
+     	'#prefix' => '<div id="crossref_result_controls">',
+    	'#suffix' => '</div>',
+    );
+	
+    
+    return $form;
+ 
+}
+
+function ajax_crossref_callback($form, &$form_state) {
+	$genome_acc = $form_state['values']['genome_acc'];
+	
+	global $base_url;
+//	drupal_set_message($form_state['values']['file_field']['get_all'], 'error');
+	$accessions = array();
+	if($form_state['values']['file_field']['get_all']==1)
+	{	
+			
+		db_set_active("refseq");
+
+		$records = db_query( "SELECT geneid FROM gene WHERE accession = :acc", array(':acc'=>$genome_acc) )->fetchAll();		
+		foreach ($records as $value) {
+			$accessions[] = $value->geneid;
+		}
+		db_set_active("default");
+//		$accessions[] = 944834;
+	}else
+	{
+	$text_input = trim($form_state['values']['file_field']['data_input']);
+	
+	if(empty($text_input)){
+		$accessions = gene_accession_file_upload($form, $form_state);
+	}else{
+		$accessions =  preg_split("/[ \r\n]+/",$text_input);
+	}
+	
+	}
+	
+//	$params_sub = array('lacz');
+
+	$rows = array();
+	$csv_rows = array();
+	
+	//All avalible id dbs including name, locus, geneis and xrefs 
+	$id_dbs = array_keys($form_state['values']['db_field']['dblist']);
+	//The subset ids use choose to download
+	$table_header = array('Accession');
+	foreach ($form_state['values']['db_field']['dblist'] as $key=>$value) {
+		if($value){
+			$table_header[] = $key;
+		}
+	}
+	
+	$csv_rows[] = $table_header;
+
+	
+	if(!empty($accessions)){
+
+			db_set_active("refseq");
+			
+			$gene_xref = array();  
+			$gene_xref[] = $value;  
+			
+			$query = db_select('dbxref','dbxref',array('fetch' => PDO::FETCH_ASSOC));
+	
+			$query -> leftJoin('gene', 'gene', 'gene.geneid=dbxref.geneid');
+			$query -> leftJoin('protein', 'protein', 'gene.geneid=protein.geneid');
+			$query -> fields('gene', array('geneid', 'name','locus_tag'));
+			$query -> fields('protein', array('protein_id'));
+			$query -> fields('dbxref', array('db', 'ref'));
+			$query -> condition('dbxref.accession', $genome_acc);
+			$records = $query->execute()->fetchAll();
+			
+			$all_genes_xref = array();
+			$all_genes_xref_hash = array();
+			foreach ($records as $value) {
+				if(array_key_exists($value['geneid'], $all_genes_xref)){
+					$all_genes_xref[$value['geneid']][$value['db']] = $value['ref'];
+					$all_genes_xref_hash[strtolower($value['ref'])] = $value['geneid'];
+				}else{
+					$all_genes_xref[$value['geneid']]=array('geneid'=>$value['geneid'],
+												'name'=>$value['name'],
+												'locus_tag'=>$value['locus_tag'],
+												'geneid'=>$value['geneid'],
+												'protein_id'=>$value['protein_id']
+												);
+					$all_genes_xref_hash[strtolower($value['geneid'])] = $value['geneid'];
+					$all_genes_xref_hash[strtolower($value['name'])] = $value['geneid'];
+					$all_genes_xref_hash[strtolower($value['locus_tag'])] = $value['geneid'];
+					$all_genes_xref_hash[strtolower($value['protein_id'])] = $value['geneid'];
+				}
+					
+			}	
+//			$markup .= print_r($table_header,true);
+			foreach ($accessions as $v) {
+				$v = trim($v);
+				if(!array_key_exists(strtolower($v),$all_genes_xref_hash)){
+					continue;
+				}
+				$gene_xref = array();  
+				$gene_xref[] = $v;  
+			
+
+				$refs = $all_genes_xref[$all_genes_xref_hash[strtolower($v)]];		
+						foreach ($table_header as $_key=>$h){
+							if($_key==0) continue;
+							if(empty($refs[$h])){						
+								$gene_xref[] = NULL;  
+							}else{
+								$gene_xref[] = $refs[$h];
+							}
+						}
+
+						$rows[] = ($gene_xref);	
+							
+			}
+	}
+			
+
+	
+	db_set_active("default");
+//	$markup = print_r($form_state['values']['file_field'], TRUE);
+//	print_r($accessions, TRUE)
+	$cache_id = 'xref_'.time();
+	array_unshift($rows,$table_header);
+  	$csv_data = refseq_store_csv('csv_'.$cache_id, $rows);
+  	$txt_data = refseq_store_txt('txt_'.$cache_id, $rows);
+//  	$markup = print_r($csv_data, TRUE);
+  	
+  	array_shift($rows);
+  	
+	$element =$form['mapping_result']['table'];
+	$element['links']['export'] = array(
+		
+    	'#markup' => $markup.'<strong>'.t('Download Result in : ').'</strong>'. l(t(' TXT file '), "refseq_data/".$genome_acc."/".$txt_data['report']."/".$txt_data['user']."/txt").
+   					 t(' or ').l(t('CSV file'), "refseq_data/".$genome_acc."/".$csv_data['report']."/".$csv_data['user']."/csv"),
+   		
+  	);
+//  	$element['text'] = array(
+//		'#markup' => $markup,
+//		);
+
+//	$element['report'] = array(
+//    	'#theme' => 'table',
+//    	'#header' => $table_header,
+//    	'#rows' => $rows,
+//  		'#caption'=>count($rows).' gene(s) are found',
+//    	'#attributes' => array('width' => '100%',  'class' => array('')),
+//  	);
+//  	
+	$commands[] = ajax_command_replace("#crossref_result_controls", drupal_render($element));
+
+   return array('#type' => 'ajax', '#commands' => $commands);
+}
+function refseq_store_txt($csv_id, $rows) {
+  global $user;
+  
+  $csv_output = '';
+  $user_id = (empty($user->uid)) ? session_id() : $user->uid;
+  foreach ($rows as $row) {
+   
+    $csv_output .= implode("\t", $row) . "\r\n";
+  }
+  
+  cache_set('refseq_' . $csv_id . '_' . $user_id, $csv_output, 'cache', REQUEST_TIME + 300);//keep the report for at least 5 minutes.
+   
+  return array('user' => $user_id, 'report' => $csv_id);
+}
+
+function refseq_get_txt($csv_id, $user_id) {
+  global $user;
+//  $user_check = (empty($user->uid)) ? session_id() : $user->uid;
+  $csv_data = cache_get('refseq_' . $csv_id . '_' . $user_id, 'cache');
+	
+  if (!$csv_data) {
+  	drupal_set_message(t("The TXT data could not be retrieved. It's possible the data might have expired. Re-submit the  page and try to retrieve the CSV file again."), 'error');
+    drupal_not_found();
+    exit();
+  }
+  else {
+    ob_end_clean();
+    $http_headers = array(
+      'Pragma' => 'private',
+      'Expires' => '0',
+      'Cache-Control' => 'private, must-revalidate',
+      'Content-Transfer-Encoding' => 'binary',
+      'Content-Length' => strlen($csv_data->data),
+      'Content-Disposition' => 'filename="' . $csv_id . '.txt"',
+      'Content-Type' => 'text/plain'
+    );
+    foreach ($http_headers as $header => $value) {
+      $value = preg_replace('/\r?\n(?!\t| )/', '', $value);
+      drupal_add_http_header($header, $value);
+    }
+
+    print $csv_data->data;
+    exit();
+  }
+}
+
+function refseq_store_csv($csv_id, $rows) {
+  global $user;
+  $csv_output = '';
+  $user_id = (empty($user->uid)) ? session_id() : $user->uid;
+  foreach ($rows as $row) {
+    foreach ($row as $index => $column) {
+      $row[$index] = '"' . str_replace('"', '""', $column) . '"';
+    }
+    $csv_output .= implode(',', $row) . "\n";
+  }
+  
+  cache_set('refseq_' . $csv_id . '_' . $user_id, $csv_output, 'cache', REQUEST_TIME + 300);//keep the report for at least 5 minutes.
+  return array('user' => $user_id, 'report' => $csv_id);
+}
+
+function refseq_get_csv($csv_id, $user_id) {
+
+  global $user;
+//  $user_check = (empty($user->uid)) ? session_id() : $user->uid;
+  $csv_data = cache_get('refseq_' . $csv_id . '_' . $user_id, 'cache');
+
+  if (!$csv_data) {
+    drupal_set_message(t("The CSV data could not be retrieved. It's possible the data might have expired. Re-submit the  page and try to retrieve the CSV file again."), 'error');
+    drupal_not_found();
+    exit();
+  }
+  else {
+    ob_end_clean();
+    $http_headers = array(
+      'Pragma' => 'private',
+      'Expires' => '0',
+      'Cache-Control' => 'private, must-revalidate',
+      'Content-Transfer-Encoding' => 'binary',
+      'Content-Length' => strlen($csv_data->data),
+      'Content-Disposition' => 'attachment; filename="' . $csv_id . '.csv"',
+      'Content-Type' => 'text/csv'
+    );
+    foreach ($http_headers as $header => $value) {
+      $value = preg_replace('/\r?\n(?!\t| )/', '', $value);
+      drupal_add_http_header($header, $value);
+    }
+
+    print $csv_data->data;
+    exit();
+  }
+}
+
+function refseq_get_data($id) {
+  $data = cache_get($id, 'cache');
+  
+  if (!$data ) {
+    drupal_set_message(t("The data could not be retrieved. It's possible the data might have expired. "), 'error');
+    drupal_not_found();
+    exit();
+  }
+  else {
+    ob_end_clean();
+    $http_headers = array(
+      'Pragma' => 'private',
+      'Expires' => '0',
+      'Cache-Control' => 'private, must-revalidate',
+      'Content-Transfer-Encoding' => 'binary',
+      'Content-Length' => strlen($data->data),
+      'Content-Disposition' => 'attachment; filename="' . $id . '.txt"',
+      'Content-Type' => 'text/plain'
+    );
+    foreach ($http_headers as $header => $value) {
+      $value = preg_replace('/\r?\n(?!\t| )/', '', $value);
+      drupal_add_http_header($header, $value);
+    }
+
+    print $data->data;
+    exit();
+  }
+  
+
+}
+
+
+function gene_accession_file_upload($form, &$form_state) {
+
+	
+	$uploadfilefield = "accessions_file_uploadfile";
+		
+	$validators = array('file_validate_extensions' =>array('txt csv'),);
+	$file = file_save_upload($uploadfilefield,$validators,'temporary://');	
+  
+  	
+  	 // now read from it
+  $realpath = drupal_realpath($file->uri);
+  $file_extension = array_pop(explode('.', $file->filename));
+  
+  $fh = fopen($realpath, 'r');
+  	
+  $ids = array();
+  if(strcmp($file_extension,'csv')==0){
+	while(($row = fgetcsv($fh, NULL,",")) !== FALSE){
+  	
+	    $ids[] = $row[0];
+    
+	}  
+  }elseif(strcmp($file_extension,'txt')==0){
+  	
+  	while(($buffer   = fgets($fh)) !== FALSE){
+  	
+  		$row = preg_split('/[\s,]+/', trim($buffer));
+
+		if(empty($row[0])){
+			continue;	
+		} 
+		    
+	    $ids[] = $row[0];
+    
+	}  
+	
+  }
+  
+  fclose($fh);
+//  $ids=array('lacy','lacz');
+//  $ids = array_unique($ids);
+	return $ids;
+}

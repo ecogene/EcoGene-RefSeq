@@ -1,0 +1,151 @@
+.refseq_genepage_inline_form div{
+  /* CSS here */
+	display: inline;
+	padding-right: 20px;
+	
+		
+}
+
+#refseq-genepage-dnaseq-form, #refseq-genepage-proteinseq-form > div{
+  /* CSS here */
+	
+	margin-right: 0px;
+/*	margin-left: 10px;
+*/		
+}
+#refseq-genepage-dnaseq-form pre{
+  /* CSS here */
+	/*font-size: 1.0em;*/
+	display: inline-block;
+	
+}
+#refseq-genepage-proteinseq-form pre{
+  /* CSS here */
+	/*font-size: 1.0em;*/
+	display: inline-block;
+	
+	
+}
+#refseq-genepage-dnaseq-form pre.coor{
+  /* CSS here */
+
+	width:15%;
+}
+#refseq-genepage-dnaseq-form pre.coorrel{
+  /* CSS here */
+
+	width:20%;
+}
+
+#refseq-genepage-dnaseq-from pre.sequence{
+  /* CSS here */
+
+	width:60%;
+}
+#refseq-genepage-proteinseq-from pre{
+  /* CSS here */
+	
+	/*font-size: 1.0em;*/
+		
+}
+input.magnify{
+  /* CSS here */
+	
+	padding-left: 1.0em;
+		
+}
+pre {
+    background-color: rgba(40, 40, 0, 0.06);
+    margin: 10px 0;
+    overflow: hidden;
+    padding: 15px;
+    white-space: pre-wrap;
+}
+h1#gene_page_title{
+	text-align: center;
+	font-size: 1.5em;
+	margin: 0em 0em 1em;
+}
+
+h1.title{
+	font-size:0.5em;
+}
+#page-title {	
+/*	visibility: hidden; 
+*/
+font-size: 0.5em;
+}
+#g_name{
+	font-style: italic;
+	font-weight: bold;
+}
+#pseudo_tag{
+	
+	color:red;
+}
+#escherichia{
+	font-style: italic;
+}
+
+h1#gene_page_title{
+	text-align: center;
+	font-size: 1.5em;
+	margin: 0em 0em 1em;
+}
+
+#gene_info table {
+	width:100%;
+	align: center;    
+	border-collapse: collapse;
+	padding: 0px;
+	margin: 0px;
+
+}
+#gene_info table tbody{
+	border-top: 0px;
+	border-bottom: 1px solid #CCCCCC; 
+}
+#gene_info table tr{
+	background: none repeat scroll 0 0 rgba(255, 255, 255, 0.063)
+}
+
+#gene_info table td {
+	padding: 5px 5px;
+	border-bottom: 1px;
+	text-align: center;
+}
+
+span.intergene
+{
+	cursor:pointer;
+	color: #0071B3;		
+}
+
+div#right_intergene, 
+div#left_intergene
+{
+	float:left;
+	position:absolute;
+	width: 150px;
+	z-index:999;
+	visibility: hidden;
+	background-color: #F9F9F9;
+	-moz-border-radius: 10px 10px 10px 10px;
+	border:1px solid #B9B9B9;
+	padding:15px 20px;
+	
+}
+
+div#right_intergene p, 
+div#left_intergene p
+{
+	margin: 0 0 0.5em;
+	text: 1.2em;
+	color: #0071B3;
+	
+}
+
+form.genemap-form div
+{
+	text-align: center;
+}

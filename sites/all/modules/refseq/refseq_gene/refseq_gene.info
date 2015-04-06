@@ -1,0 +1,9 @@
+name = Gene
+description = A module of GenePage for NCBI Refrence Sequence.
+dependencies[] = refseq
+package = RefSeq
+core = 7.x
+
+core = "7.x"
+project = "RefSeq"
+

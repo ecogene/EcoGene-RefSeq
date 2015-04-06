@@ -1,0 +1,13 @@
+name = RefSeq
+description = A module for NCBI Refrence Sequence.
+package = RefSeq
+core = 7.x
+files[] = includes/refseq.genemappng.inc
+files[] = includes/refseq.dna_sequence.inc
+files[] = includes/refseq.genemap.inc
+files[] = includes/refseq.restriction_site.inc
+files[] = includes/refseq.function.inc
+files[] = includes/ecogene.function.inc
+core = "7.x"
+project = "RefSeq"
+

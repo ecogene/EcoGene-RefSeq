@@ -1,0 +1,81 @@
+@CHARSET "ISO-8859-1";
+/* $Id: node.css,v 1.18 2010/09/17 14:53:21 dries Exp $ */
+#refseq-gene-menu-nav-contain {
+
+		float:left;
+		position:relative;
+		font-size: 1.0em;
+		text-shadow: 0 1px #EEEEEE;
+    	margin: 0;
+    	padding: 0px 5px;
+		z-index:2;
+	}
+		#refseq-gene-menu-nav-contain ul {
+		margin: 0;
+		padding: 0;
+		z-index:3;
+	}
+		#refseq-gene-menu-nav-contain li a {
+			display:block;
+			padding:5px;
+			
+		}
+		#refseq-gene-menu-nav-contain li:hover, #refseq-gene-menu-nav-contain li a:focus, #refseq-gene-menu-nav-contain li a:active {
+			background:#E2E266;
+		
+		}
+		
+		#refseq-gene-menu-nav-contain li {
+			display: inline-block;
+			list-style-type: none;
+			padding:0 5px; 
+			z-index:4;
+			width: 120px;
+		}
+		/* SAFARI-ONLY POSITIONING */
+			 /*\*/
+		 html>body*#refseq-gene-menu-nav-contain li {padding:0 3px;}
+			 /**/			
+		#refseq-gene-menu-nav-contain li ul {
+				background:#EEE;
+				border:1px solid #CCFFCC;
+				left: -999em;
+				position: absolute;
+				width: 276px;
+				z-index:998;
+		 		margin-left:-5px;
+		 
+			}
+				#refseq-gene-menu-nav-contain li ul li {
+					padding:3px 2px 3px 5px;
+					background:none !important;
+				}
+				#refseq-gene-menu-nav-contain li:hover ul a {
+					display:block;
+					width:70px;
+				}
+				#refseq-gene-menu-nav-contain li:hover ul a:hover {
+				
+				}
+			#refseq-gene-menu-nav-contain li:hover ul, #refseq-gene-menu-nav-contain  li.sfhover ul {
+				left:auto;
+				background:#CCFFCC;
+				white-space:normal;
+				z-index:999;
+			}
+				#refseq-gene-menu-nav-contain li:hover ul a, #refseq-gene-menu-nav-contain  li.sfhover ul a {
+					display:block;
+					font-weight:normal !important;
+					width:70px; 
+				}
+				#refseq-gene-menu-nav-contain li:hover ul a:hover, #refseq-gene-menu-nav-contain  li.sfhover ul a:hover {
+					text-decoration:underline;
+				    font-weight:bold;
+				}
+
+
+#refseq-gene-menu-nav-contain li ul li {
+    background: none repeat scroll 0 0 transparent !important;
+    padding: 3px 2px 3px 5px;
+}
+

@@ -1,0 +1,213 @@
+<?php
+
+/**
+ * @file
+ * The product module for Ubercart.
+ *
+ * Provides information that is common to all products, and user-defined product
+ * classes for more specification.
+ */
+
+/******************************************************************************
+ * Drupal Hooks                                                               *
+ ******************************************************************************/
+
+/**
+ * Implements hook_menu().
+ */
+function refseq_gene_menu() {
+  $items = array();
+
+
+   $items['refseq/%/gene/%'] = array(
+    'title' => 'GenePage',
+ 	'page callback' => 'refseq_genepage',
+    'page arguments' => array(1,3),
+    'access callback' => TRUE,
+   	'file' => 'refseq_gene.page.inc',
+    'weight' => 10,   
+     );
+   
+
+   $items['refseq/%/gene'] = array(
+    'title' => 'Gene Index',
+ 	'page callback' => 'refseq_gene_index_content',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+  	'type'=>MENU_LOCAL_TASK,
+    'weight' => 10,
+    );
+  $items['refseq/sitesinfo'] = array(
+    'title' => 'Restriction Enzymes List',
+ 	'page callback' => 'list_of_restrction_sites',
+//    'page arguments' => array(1),
+    'access callback' => TRUE,
+  
+    'weight' => 10,
+    );
+   
+  return $items;
+}
+function refseq_gene_index_content($accession) {
+
+	
+	 
+	$content  = '<div class="eco_geneindex">';
+	$content .= '<p>This is an alphabetical index to the individual GenePages. Point at a gene name for complete list. Alternatively, try Search Tool to retrieve GenePages.</p>
+	</div>';
+//	$content = 'OK';
+	$content .= refseq_gene_index_list($accession);
+	return $content;	
+}
+function refseq_gene_index_list($accession)
+{
+	global $base_url;
+	
+	// Edit to configure PHP Drop Down Menu
+		
+	// Connecting to database and get gene names and eg_ids 
+ 	db_set_active('refseq');
+ 	$dbTable = "gene";  
+ 	
+ 	$query = db_select($dbTable, 'gene', array('fetch' => PDO::FETCH_OBJ));
+  	$query->fields('gene', array(
+  	  'geneid', 
+      'name',	
+  	  'locus_tag',
+    ))
+    ->condition('Accession', $accession)
+    ->orderBy('name')->orderBy('geneid');
+
+   $info = $query->execute()->fetchAll();
+   
+	
+	$maxsubmenu = 19; // max number of item in the submenu
+		
+	$i = 0;
+	$r = 0; $c = 0; // position of the row and column of the menu
+	$genepage_linker = $base_url."?q=refseq/$accession/gene/";
+//	var_dump($info);
+	
+	drupal_add_css(drupal_get_path('module', 'refseq_gene') . '/refseq_gene_index.css');
+//	drupal_add_js(drupal_get_path('module', 'refseq_gene') . '/refseq_gene_index.js');
+	$content = '<div id="refseq-gene-menu-nav-contain" ><ul>';
+	foreach ($info as $row)
+	{
+		$name = empty($row->name)? $row->locus_tag:$row->name;
+		$name = empty($name)? $row->geneid:$name;
+		
+		if ((fmod($i, $maxsubmenu)) == 0) {
+			$content .= '<li><a href="'.$genepage_linker.$row->geneid.'" title="'.$row->name.' gene page">'.$name.'</a><ul>';
+			
+		}else {
+			
+				$content .='<li><a href="'.$genepage_linker.$row->geneid.'" title="'.$row->name.' gene page">'.$name.'</a></li>';
+		}	
+		
+		$i++;
+		
+		if ((fmod($i, $maxsubmenu)) == 0) {
+			$content .='</ul></li>';
+
+			
+		}
+		
+
+	}
+	if ((fmod($i, $maxsubmenu)) != 0) {
+			$content .='</ul></li>';
+
+	}
+	$content .= '</ul></div>';
+ 
+	db_set_active('default');
+	return $content;
+}
+
+function list_of_restrction_sites(){
+	$content = "You can copy and paste additional restriction enzyme names from this list into the restriction enzymes box on a GenePage and click Submit. 
+	Up to seven restriction maps can be displayed. 
+	This full list of restriction enzymes and their DNA recognition sequences is obtained from REBASE <a href='http://www.ncbi.nlm.nih.gov/pubmed/19846593'>(Roberts et al., 2010)</a>. 
+	Clicking on the restriction enzyme name next to the restriction maps links to additional information at <a href='http://rebase.neb.com'>REBASE</a>.";
+	
+	$content .= '<br /><br />Note: Non Palindromic Sites are marked with red.<br />';
+//	
+//	 '<a href="#A">A</a>|<a href="#B">B</a>|<a href="#C">C</a>|<a href="#D">D</a>|<a href="#E">E</a>|<a href="#F">F</a>|<a href="#G">G</a>|<a href="#H">H</a>|<a href="#I">I</a>|<a href="#J">J</a>|<a href="#K">K</a>|<a href="#L">L</a>|<a href="#M">M</a>
+//
+//<a href="#N">N</a>|<a href="#O">O</a>|<a href="#P">P</a>|<a href="#Q">Q</a>|<a href="#R">R</a>|<a href="#S">S</a>|<a href="#T">T</a>|<a href="#U">U</a>|<a href="#V">V</a>|<a href="#W">W</a>|<a href="#X">X</a>|<a href="#Y">Y</a>|<a href="#Z">Z</a>';
+	$letter = array("A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z");
+		
+ 	db_set_active('refseq'); 
+
+	$enzyme_tbl = "t_enzyme";
+	
+	$query = db_select($enzyme_tbl,'enzyme')->fields('enzyme');
+	$records = $query->orderBy('name')->execute()->fetchAll();;
+	
+	
+	$letter_count = 0;
+	$i = 0;
+	$name = '';
+
+	$list_enzyme = array();
+	foreach ($letter as $value) {
+		$list_enzyme[$value] = '';
+	}
+	foreach ($records as $value) {
+	
+		$enzyme_name =trim($value->name);
+		$pattern_disply = trim($value->sequence);
+		$is_symmetrical = $value->is_symmetrical;
+		$sequence = trim($value->seq);
+	
+	
+		if(($is_symmetrical)==0)
+				$list_enzyme[strtoupper($enzyme_name[0])] .= "<font style='color: red'>$enzyme_name, $sequence</font><br/>";
+		else
+				$list_enzyme[strtoupper($enzyme_name[0])] .= "$enzyme_name, $sequence<br/>";
+				
+				
+	}
+//	var_dump($list_enzyme);
+	$conten_list = "";
+	$conten_list_head = "";
+	foreach ($letter as $name) {
+		
+		if (!empty($list_enzyme[$name])){
+			$conten_list .= "<a name=$name></a><br><table width=\"100%\" cellpadding=0 cellspacing=0 border=0><tr><td><b>$name</b></td><td align=right><a href=\"#TOP\">Go to Top</a></td></tr>
+</table>".$list_enzyme[$name];
+
+			$conten_list_head .= "<a href='#".$name."'>".$name."</a>|";
+		}
+		
+	}
+	$conten_list_head = trim($conten_list_head, "|");
+	
+	$content .= $conten_list_head.$conten_list;
+//			while ($name<$enzyme_name[0]) {
+//				
+//				$name = $letter[$letter_count];
+//				$letter_count++;
+//				$content.= "<a name=$name></a><br><table width=\"100%\" cellpadding=0 cellspacing=0 border=0><tr><td><b>$name</b></td><td align=right><a href=\"#TOP\">Go to Top</a></td></tr>
+//</table>";
+//
+//			}
+//			if(($is_symmetrical)==0)
+//				$content.= "<font style='color: red'>$enzyme_name, $sequence</font><br/>";
+//			else
+//				$content.= "$enzyme_name, $sequence<br/>";
+//			
+//			$i ++;
+//	}
+//	while ($letter_count < count($letter)) {				
+//				$name = $letter[$letter_count];
+//				$letter_count++;
+//				$content.= "<a name=$name></a><br><table width=\"100%\" cellpadding=0 cellspacing=0 border=0><tr><td><b>$name</b></td><td align=right><a href=\"#TOP\">Go to Top</a></td></tr>
+//		</table>";
+//
+//	}
+		
+		db_set_active('default'); 
+		
+		return $content;
+}
